@@ -1,0 +1,13 @@
+
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.vscode/
+.ipynb_checkpoints/
+data/raw/
+data/processed/
+models/checkpoints/
+*.pth
+*.pt
+*.ckpt
