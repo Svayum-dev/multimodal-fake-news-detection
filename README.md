@@ -1,221 +1,339 @@
-# Multimodal Fake News Detection Using Vision-Language Models
+# 📰 Multimodal Fake News Detection Using Vision-Language Models
 
-A research/academic implementation of the project proposal. It combines a news post's text and image using a pretrained CLIP vision-language encoder and a trainable multimodal fusion classifier.
+A multimodal AI research project that analyzes news claims using both textual and visual information. Built using **OpenAI CLIP (ViT-B/32), PyTorch, and Streamlit**, the system combines fake-news classification, image-text consistency screening, and external news evidence retrieval.
 
-## What this project does
+The goal is to explore how vision-language models can help identify potentially misleading news content.
 
-1. Reads Fakeddit TSV splits.
-2. Downloads associated images from the `image_url` field (where URLs are still accessible).
-3. Encodes text and images with `openai/clip-vit-base-patch32`.
-4. Fuses text and image features and trains a binary classifier.
-5. Evaluates the model with accuracy, precision, recall, F1, and a confusion matrix.
-6. Runs predictions through a Streamlit interface.
-7. Flags low-confidence predictions as **Uncertain** and reports text-image similarity as a diagnostic signal.
-8. Optionally retrieves Wikipedia context for a claim. Retrieved context is supplementary evidence, not proof that a claim is true or false.
+---
 
-> Important: Fakeddit's `2_way_label` is a dataset label, not a universal ground-truth fact-check. The model is a research prototype and must not be treated as an authoritative fact-checker.
+## 🚀 Project Overview
 
-## Architecture
+Traditional fake-news classification systems often rely only on textual information. However, online news posts frequently contain both text and images.
 
-```text
-                Text / headline                Image
-                      |                           |
-                CLIP text encoder           CLIP image encoder
-                      |                           |
-                Text embedding              Image embedding
-                      |                           |
-                      +---- Multimodal fusion ----+
-                                  |
-                    [text, image, |t-i|, t*i,
-                       cosine similarity]
-                                  |
-                         MLP classifier
-                                  |
-                      Real / Fake probability
-                                  |
-                 Confidence + mismatch diagnostic
-                                  |
-                  Optional contextual retrieval
+This project uses a multimodal approach to analyze both inputs together.
+
+The system provides three independent analysis signals:
+
+1. **AI Classification:** Predicts whether a news post is Real or Fake.
+2. **Image-Text Consistency:** Measures semantic similarity between the submitted text and image using CLIP.
+3. **External News Evidence:** Retrieves related news coverage to help users investigate a claim.
+
+These signals are presented separately to avoid treating model predictions or similarity scores as definitive proof of truth.
+
+## ✨ Key Features
+
+- Multimodal text and image classification.
+- CLIP ViT-B/32 pretrained vision-language encoder.
+- Frozen CLIP backbone with a trainable fusion classifier.
+- Text-image cosine similarity analysis.
+- Confidence-based Uncertain classification.
+- Validation-calibrated image consistency threshold.
+- External news retrieval using Google News RSS.
+- TF-IDF-based topical relevance ranking.
+- Interactive Streamlit dashboard.
+- Evaluation using accuracy, precision, recall, F1-score, ROC-AUC, and confusion matrices.
+
+## 🧠 System Architecture
+
+```mermaid
+flowchart TD
+    A[News Headline / Claim] --> B[CLIP Text Encoder]
+    C[Uploaded Image] --> D[CLIP Image Encoder]
+
+    B --> E[Text Embedding]
+    D --> F[Image Embedding]
+
+    E --> G[Multimodal Feature Fusion]
+    F --> G
+
+    G --> H[Trainable MLP Classifier]
+    H --> I[Real / Fake / Uncertain]
+
+    E --> J[Cosine Similarity]
+    F --> J
+    J --> K[Image-Text Consistency Screening]
+
+    A --> L[Google News RSS Retrieval]
+    L --> M[TF-IDF Relevance Ranking]
+
+    I --> N[Combined Assessment Dashboard]
+    K --> N
+    M --> N
 ```
 
-The CLIP backbone is frozen in the initial implementation. The fusion classifier is trained on the selected Fakeddit split. This keeps training practical on a student laptop; an optional fine-tuning extension is described below.
+### Model Architecture
 
-## Repository structure
+The project uses `openai/clip-vit-base-patch32` to generate normalized text and image embeddings.
+
+The fusion classifier receives five feature groups:
+
+- Text embedding
+- Image embedding
+- Absolute difference between embeddings
+- Element-wise product of embeddings
+- Cosine similarity between text and image embeddings
+
+These features are passed through a multilayer perceptron (MLP) that predicts two classes:
+
+| Label | Meaning |
+|---|---|
+| 0 | Real |
+| 1 | Fake |
+
+The CLIP backbone is frozen during training, while the fusion classifier is trained using the Fakeddit dataset.
+
+## 📊 Dataset
+
+**Dataset:** Fakeddit
+
+The project uses the multimodal Fakeddit dataset containing news-related text and images.
+
+After image availability and data-quality filtering, the usable image-text pairs were:
+
+| Split | Usable pairs |
+|---|---:|
+| Training | 51,316 |
+| Validation | 5,712 |
+| Testing | 5,676 |
+| **Total** | **62,704** |
+
+Raw dataset files and downloaded images are excluded from this GitHub repository because of their size.
+
+Users must obtain the dataset separately and prepare the expected TSV files and image directory.
+
+## 🏆 Model Performance
+
+The trained multimodal classifier achieved the following results on the held-out Fakeddit test split:
+
+| Metric | Score |
+|---|---:|
+| Accuracy | **91.90%** |
+| Macro Precision | 91.11% |
+| Macro Recall | 92.33% |
+| Macro F1-score | **91.59%** |
+
+### Per-Class Performance
+
+| Class | Precision | Recall | F1-score |
+|---|---:|---:|---:|
+| Real | 96.16% | 90.42% | 93.20% |
+| Fake | 86.07% | 94.25% | 89.97% |
+
+### Image-Text Consistency Evaluation
+
+A separate evaluation was performed using original matched text-image pairs and synthetic mismatched pairs created by randomly swapping images within the same split.
+
+The similarity threshold was calibrated on validation data using maximum Youden's J statistic.
+
+| Metric | Test result |
+|---|---:|
+| Threshold | 0.21961 |
+| Accuracy | 84.21% |
+| Balanced Accuracy | 84.21% |
+| Precision | 90.44% |
+| Recall | 76.50% |
+| F1-score | 82.89% |
+| ROC-AUC | **92.41%** |
+
+**Important:** These are two separate evaluations. The 91.90% accuracy measures Real/Fake classification on Fakeddit. The consistency metrics measure the distinction between original image-text pairs and synthetic image mismatches. Neither result represents real-world fact-checking accuracy.
+
+## 🖥️ Application Dashboard
+
+The Streamlit application allows users to:
+
+1. Enter a news headline or claim.
+2. Upload its associated image.
+3. View the classifier's prediction and probabilities.
+4. Inspect CLIP image-text similarity.
+5. Receive a review recommendation when appropriate.
+6. Retrieve related news coverage for further investigation.
+
+### Screenshots
+
+Add your application screenshots here:
+
+```text
+docs/
+└── screenshots/
+    ├── dashboard.png
+    ├── fake-prediction.png
+    └── evidence-results.png
+```
+
+Once added, you can display them using:
+
+```markdown
+![Dashboard](docs/screenshots/dashboard.png)
+```
+
+## 🛠️ Technology Stack
+
+| Technology | Purpose |
+|---|---|
+| Python | Core programming language |
+| PyTorch | Deep learning framework |
+| Hugging Face Transformers | CLIP implementation |
+| CLIP ViT-B/32 | Vision-language feature extraction |
+| Pandas & NumPy | Data processing |
+| Scikit-learn | Evaluation and TF-IDF |
+| Streamlit | Interactive web application |
+| Matplotlib | Evaluation visualizations |
+| BeautifulSoup & Requests | External article retrieval |
+
+## 📁 Project Structure
 
 ```text
 multimodal-fake-news-detection/
-├── app.py
-├── requirements.txt
-├── README.md
-├── .gitignore
-├── config/
-│   └── config.yaml
-├── data/
-│   ├── raw/
-│   ├── processed/
-│   └── images/
-├── checkpoints/
-├── outputs/
+│
+├── app/
+│   ├── app.py
+│   ├── predict.py
+│   └── evidence.py
+│
 ├── src/
-│   ├── __init__.py
 │   ├── dataset.py
 │   ├── model.py
 │   ├── train.py
 │   ├── evaluate.py
+│   ├── evaluate_consistency.py
 │   ├── predict.py
 │   └── evidence.py
-└── scripts/
-    ├── download_images.py
-    └── inspect_dataset.py
+│
+├── scripts/
+│   ├── download_images.py
+│   ├── inspect_dataset.py
+│   └── prepare_samples.py
+│
+├── config/
+│   └── config.yaml
+│
+├── data/
+│   ├── raw/
+│   ├── processed/
+│   └── images/
+│
+├── checkpoints/
+├── outputs/
+│
+├── requirements.txt
+├── .gitignore
+└── README.md
 ```
 
-## 1. Environment setup (VS Code)
+## ⚙️ Installation and Setup
 
-Python 3.10 or 3.11 is recommended.
+### 1. Clone the repository
 
 ```bash
-python -m venv .venv
+git clone https://github.com/Svayum-dev/multimodal-fake-news-detection.git
+cd multimodal-fake-news-detection
 ```
+
+### 2. Create a virtual environment
 
 Windows PowerShell:
 
 ```powershell
+python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-Install dependencies:
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-PyTorch installation can differ depending on your CUDA setup. If the standard installation does not detect your NVIDIA GPU, install the appropriate CUDA-enabled PyTorch build from the official PyTorch installation selector.
+For GPU acceleration, install a compatible CUDA-enabled PyTorch build for your system using the official PyTorch installation instructions.
 
-## 2. Prepare Fakeddit
+### 4. Prepare the dataset
 
-Download the Fakeddit multimodal TSV files from the dataset's official distribution and put them in `data/raw/`:
+Obtain the Fakeddit dataset separately.
+
+Place the TSV files in `data/raw/`:
 
 ```text
 data/raw/
-├── multimodal_train.tsv
-├── multimodal_validate.tsv
-└── multimodal_test_public.tsv
+├── train_56000.tsv
+├── validate_6000.tsv
+└── test_6000.tsv
 ```
 
-The code expects these columns:
-- `clean_title`: text input
-- `image_url`: image URL
-- `2_way_label`: binary target (0 = Real, 1 = Fake, as used by this project)
-- `id`: post identifier, when present
-- `hasImage`: optional image availability indicator
+Download and prepare the associated images using the project scripts. The images should be stored in:
 
-The loader also accepts `title` if `clean_title` is unavailable. Run:
+```text
+data/images/
+```
+
+### 5. Train the model
+
+If you do not already have a trained checkpoint, run:
 
 ```bash
-python scripts/inspect_dataset.py --file data/raw/multimodal_train.tsv
+python -m src.train --train data/raw/train_56000.tsv --val data/raw/validate_6000.tsv --epochs 5 --batch-size 16
 ```
 
-Download images:
-
-```bash
-python scripts/download_images.py --file data/raw/multimodal_train.tsv
-python scripts/download_images.py --file data/raw/multimodal_validate.tsv
-python scripts/download_images.py --file data/raw/multimodal_test_public.tsv
-```
-
-By default, images are saved as `data/images/<id>.jpg`. The downloader skips existing images and records failed downloads. Image hosting links may be expired or rate-limited; therefore, the number of usable image-text pairs may be lower than the TSV row count.
-
-For a quick smoke test, limit the download:
-
-```bash
-python scripts/download_images.py --file data/raw/multimodal_train.tsv --limit 500
-```
-
-## 3. Train
-
-Start with a small subset to verify the complete pipeline:
-
-```bash
-python -m src.train --train data/raw/multimodal_train.tsv --val data/raw/multimodal_validate.tsv --max-train-rows 2000 --max-val-rows 500 --epochs 2
-```
-
-Then increase the sample size after confirming that the data and images load correctly. For a full run, omit the `--max-*` arguments:
-
-```bash
-python -m src.train --train data/raw/multimodal_train.tsv --val data/raw/multimodal_validate.tsv --epochs 5 --batch-size 16
-```
-
-The first run downloads the CLIP model weights from Hugging Face. An internet connection is required unless the model is already cached. Training saves the best checkpoint to:
+The best model checkpoint is saved to:
 
 ```text
 checkpoints/best_model.pt
 ```
 
-The default batch size may need to be reduced if GPU memory is insufficient. Use `--batch-size 4` or `--batch-size 8` if you encounter CUDA out-of-memory errors.
+The first run downloads the pretrained CLIP model from Hugging Face.
 
-## 4. Evaluate
+### 6. Run the application
 
-```bash
-python -m src.evaluate --test data/raw/multimodal_test_public.tsv --checkpoint checkpoints/best_model.pt
-```
-
-Metrics and a confusion matrix are saved in `outputs/`.
-
-## 5. Launch the application
+Make sure `checkpoints/best_model.pt` exists, then execute:
 
 ```bash
-streamlit run app.py
+streamlit run app/app.py
 ```
 
-Upload an image, enter its headline or claim, and run the prediction. The app shows:
-- predicted class or Uncertain
-- model confidence
-- text-image cosine similarity
-- a simple diagnostic explanation
-- optional Wikipedia context lookup
+The application will open in your browser.
 
-The similarity score is not itself a truth score. A low score can indicate that the image and text are semantically different, but it does not establish that the post is fake.
+## 📦 Model Checkpoints
 
-## 6. Label and uncertainty behavior
+Trained model weights are not included in this repository because each checkpoint is approximately 582 MB.
 
-The training target is binary: 0 = Real, 1 = Fake. The user interface adds an operational third state:
-- **Real**: real-class probability is at least the confidence threshold.
-- **Fake**: fake-class probability is at least the confidence threshold.
-- **Uncertain**: neither class reaches the threshold.
+The application expects:
 
-This is a confidence-based abstention mechanism, not a third class learned from Fakeddit. Adjust the threshold in the Streamlit sidebar after validation.
-
-## 7. GitHub
-
-Before pushing, make sure raw data, images, model weights, and secrets are not committed. They are excluded by `.gitignore`.
-
-```bash
-git init
-git add .
-git commit -m "Initial multimodal fake news detection project"
-git branch -M main
-git remote add origin https://github.com/<your-username>/multimodal-fake-news-detection.git
-git push -u origin main
+```text
+checkpoints/best_model.pt
 ```
 
-## Limitations and next research steps
+You can generate this checkpoint by running the training command above or obtain the corresponding trained weights separately.
 
-- Fakeddit labels can contain noise and do not cover every misinformation category.
-- Some image URLs may no longer work.
-- The baseline uses a frozen CLIP encoder and a trained fusion head.
-- Text-image similarity is a mismatch clue, not a factual verification result.
-- Wikipedia retrieval supplies context, not authoritative verification.
-- The current model does not detect image manipulation or establish image recency.
+## ⚠️ Limitations
 
-Recommended extensions for the full research version:
-1. Compare text-only, image-only, and multimodal baselines.
-2. Add VERITE or NewsCLIPpings for image-context mismatch evaluation.
-3. Add a dedicated image manipulation detector.
-4. Add trustworthy news/search sources and source ranking for evidence retrieval.
-5. Fine-tune CLIP or compare BLIP-2 / other vision-language models.
-6. Add calibration and evaluate the uncertain/abstention rate.
-7. Report per-class precision, recall, F1, macro-F1, and confusion matrix.
+- Fakeddit labels are dataset annotations, not universal factual ground truth.
+- The classifier may misclassify claims outside the training distribution.
+- CLIP similarity measures semantic alignment, not factual truth.
+- A low image-text similarity score does not prove that a news claim is fake.
+- Google News retrieval and TF-IDF scores measure topical relevance, not whether an article supports or contradicts a claim.
+- The system does not independently verify the authenticity, date, or manipulation history of an image.
 
-## Reproducibility
+This project is a research prototype and should be treated as a decision-support tool rather than an authoritative fact-checking system.
 
-The training script sets random seeds and records the model name, label mapping, and validation metrics in the checkpoint. Results can still vary with hardware, package versions, dataset availability, and random initialization of the fusion head.
+## 🔮 Future Improvements
+
+- Add explainability techniques for multimodal predictions.
+- Evaluate on additional datasets such as VERITE and NewsCLIPpings.
+- Improve confidence calibration and uncertainty estimation.
+- Add source credibility analysis.
+- Investigate image manipulation detection.
+- Compare frozen CLIP against fine-tuned vision-language models.
+- Improve evidence retrieval and claim verification.
+
+## 👨‍💻 Author
+
+**Svayum Kapoor**
+
+B.Tech Computer Science and Engineering — AI/ML
+
+GitHub: [@Svayum-dev](https://github.com/Svayum-dev)
+
+---
+
+⭐ If you find this project interesting, consider giving the repository a star.
+
+**Disclaimer:** This project is developed for academic and research purposes. Its predictions should not be interpreted as definitive determinations of whether a news claim is true or false.
