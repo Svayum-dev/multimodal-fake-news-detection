@@ -1,0 +1,38 @@
+
+# Python environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Secrets and local settings
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Dataset and downloaded images
+data/raw/*
+data/processed/*
+data/images/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/images/.gitkeep
+
+# Model checkpoints
+checkpoints/*
+!checkpoints/.gitkeep
+*.pt
+*.pth
+*.bin
+
+# Generated outputs
+outputs/*
+!outputs/.gitkeep
+
+# Logs
+*.log
